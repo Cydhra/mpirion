@@ -24,21 +24,22 @@ The benchmark structure is similar to Criterion's, but you need to use the `mpir
 Additionally, you need one extra method which contains the MPI calls you want to benchmark.
 
 ```rust
-// This method is only called on the root process and contains the benchmark setup. It spawns the child processes
-// which run the kernel and measure the time it takes to run the kernel. The times are then send to the root process
-// and passed to criterion.
+// This method is only called on the root process and contains the benchmark setup.
+// It spawns the child processes which run the kernel and measure the time it takes to 
+// run the kernel. The times are then send to the root process and passed to criterion.
 fn simple_benchmark(c: &mut Criterion, world: &dyn Communicator) {
     c.bench_function("prefix-sum", |b| mpirion_bench!(world, b));
 }
 
-// This method is called once per iteration (on each MPI process) and returns the data that is passed to the kernel,
-// but is not included in the benchmarked time.
+// This method is called once per iteration (on each MPI process) and returns the data
+// that is passed to the kernel, but is not included in the benchmarked time.
 fn setup(comm: &dyn Communicator) -> u64 {
     comm.rank() as u64
 }
 
-// This method is called once per iteration (on each MPI process) and contains the MPI calls you want to benchmark. 
-// It is not called on the root process, and the root process will not be included in the communicator.
+// This method is called once per iteration (on each MPI process) and contains the MPI
+// calls you want to benchmark. It is not called on the root process, and the root 
+// process will not be included in the communicator.
 fn simple_kernel(comm: &dyn Communicator, data: &u64) {
     let mut recv_buffer = 0u64;
     comm.scan_into(data, &mut recv_buffer, SystemOperation::sum());
