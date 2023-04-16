@@ -1,8 +1,7 @@
 use criterion::{BenchmarkId, Criterion};
-use mpi::collective::{CommunicatorCollectives, Root, SystemOperation};
+use mpi::collective::{CommunicatorCollectives, Root};
 use mpi::traits::Communicator;
 use mpirion::{mpirion_bench, mpirion_group, mpirion_kernel, mpirion_main};
-use std::env;
 
 fn collective_comm_benchmark(c: &mut Criterion, world: &dyn Communicator) {
     let mut g = c.benchmark_group("collective-comm");
