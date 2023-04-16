@@ -59,7 +59,6 @@ macro_rules! mpirion_main {
     };
 }
 
-
 /// Generate a criterion benchmark group that initializes MPI for the root process and
 /// then calls the target function. This function panics if it isn't run on a single node at rank
 /// 0. This macro works the same as criterion's ``criterion_group!``.
