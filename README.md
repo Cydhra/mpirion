@@ -20,7 +20,36 @@ criterion = "0.4"
 mpirion = { version = "0.1", git="https://github.com/Cydhra/mpirion" }
 ```
 
-See example benchmarks in `examples/`.
+The benchmark structure is similar to Criterion's, but you need to use the `mpirion` macros instead of `criterion`.
+Additionally, you need one extra method which contains the MPI calls you want to benchmark.
+
+```rust
+// This method is only called on the root process and contains the benchmark setup. It spawns the child processes
+// which run the kernel and measure the time it takes to run the kernel. The times are then send to the root process
+// and passed to criterion.
+fn simple_benchmark(c: &mut Criterion, world: &dyn Communicator) {
+    c.bench_function("prefix-sum", |b| mpirion_bench!(world, b));
+}
+
+// This method is called once per iteration (on each MPI process) and returns the data that is passed to the kernel,
+// but is not included in the benchmarked time.
+fn setup(comm: &dyn Communicator) -> u64 {
+    comm.rank() as u64
+}
+
+// This method is called once per iteration (on each MPI process) and contains the MPI calls you want to benchmark. 
+// It is not called on the root process, and the root process will not be included in the communicator.
+fn simple_kernel(comm: &dyn Communicator, data: &u64) {
+    let mut recv_buffer = 0u64;
+    comm.scan_into(data, &mut recv_buffer, SystemOperation::sum());
+}
+
+mpirion_kernel!(simple_kernel, setup);
+mpirion_group!(benches, simple_benchmark);
+mpirion_main!(benches, simple_kernel);
+```
+
+See full example benchmarks in `examples/`.
 There are two flavors of the macros, one which accepts 
 [benchmarks with input](https://bheisler.github.io/criterion.rs/book/user_guide/benchmarking_with_inputs.html) and
 one which does not. You can find examples for both.
