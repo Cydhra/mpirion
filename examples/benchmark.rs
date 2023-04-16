@@ -8,9 +8,7 @@ fn collective_comm_benchmark(c: &mut Criterion, world: &dyn Communicator) {
     let mut g = c.benchmark_group("collective-comm");
     for size in [1, 2, 4, 8, 16, 32, 64, 128, 256].into_iter() {
         g.bench_with_input(BenchmarkId::new("message-size", size), &size, |b, &size| {
-            b.iter_custom(|mut iterations| {
-                mpirion_bench!(world, iterations, size);
-            })
+            mpirion_bench!(world, b, size)
         });
     }
     g.finish();

@@ -94,30 +94,32 @@ macro_rules! mpirion_kernel {
 
 #[macro_export]
 macro_rules! mpirion_bench {
-    ($world:ident, $iterations:ident $(, $argument:ident)?) => {
-        // create child processes
-        let mut child_exe = std::process::Command::new(env::current_exe().expect("failed to retrieve benchmark executable path"));
-        child_exe.arg("--child");
+    ($world:ident, $bencher:ident $(, $argument:ident)?) => {
+        $bencher.iter_custom(|mut iterations| {
+            // create child processes
+            let mut child_exe = std::process::Command::new(env::current_exe().expect("failed to retrieve benchmark executable path"));
+            child_exe.arg("--child");
 
-        let child_inter_comm = $world.process_at_rank(0).spawn(
-            &child_exe,
-            4, // TODO make this a parameter
-        ).expect("failed to spawn child processes");
-        let child_world_size = child_inter_comm.remote_size();
-        assert_eq!(child_world_size, 4);
+            let child_inter_comm = $world.process_at_rank(0).spawn(
+                &child_exe,
+                4, // TODO make this a parameter
+            ).expect("failed to spawn child processes");
+            let child_world_size = child_inter_comm.remote_size();
+            assert_eq!(child_world_size, 4);
 
-        // create intracomm for parent and the children
-        let merged_comm = child_inter_comm.merge(mpi::topology::MergeOrder::Low);
+            // create intracomm for parent and the children
+            let merged_comm = child_inter_comm.merge(mpi::topology::MergeOrder::Low);
 
-        merged_comm.this_process().broadcast_into(&mut $iterations);
-        $(
-            let mut input = $argument.clone();
-            merged_comm.this_process().broadcast_into(&mut input);
-        )?
+            merged_comm.this_process().broadcast_into(&mut iterations);
+            $(
+                let mut input = $argument.clone();
+                merged_comm.this_process().broadcast_into(&mut input);
+            )?
 
-        let mut total_nanos: u64 = 0;
-        merged_comm.this_process().reduce_into_root(&[0u64], &mut total_nanos, SystemOperation::sum());
-        total_nanos = (total_nanos as f64 / child_world_size as f64) as u64;
-        return std::time::Duration::from_nanos(total_nanos);
+            let mut total_nanos: u64 = 0;
+            merged_comm.this_process().reduce_into_root(&[0u64], &mut total_nanos, SystemOperation::sum());
+            total_nanos = (total_nanos as f64 / child_world_size as f64) as u64;
+            std::time::Duration::from_nanos(total_nanos)
+        })
     }
 }
