@@ -1,3 +1,5 @@
+pub use paste::*;
+
 /// Generate a main method that configures criterion and initializes MPI, or runs a kernel
 /// function if it is called for an MPI spawned process. Only one group can be defined per benchmark,
 /// so this macro does not take a variadic list of groups.
@@ -48,7 +50,7 @@ macro_rules! mpirion_main {
                     if let Some(kernel_arg) = args.next() {
                         match kernel_arg.as_str() {
                             $(
-                            stringify!($kernel) => paste::paste! {[<execute_kernel_ $kernel>]} (),
+                            stringify!($kernel) => $crate::paste! {[<execute_kernel_ $kernel>]} (),
                             )*
                             _ => panic!("unknown child kernel \"{}\"", kernel_arg),
                         };
@@ -127,7 +129,7 @@ macro_rules! mpirion_group {
 #[macro_export]
 macro_rules! mpirion_kernel {
     ($target:path, $setup:path $(, $t:ty)?) => {
-        paste::paste! {
+        $crate::paste! {
             fn [<execute_kernel_ $target>] () {
                 let universe = mpi::initialize().unwrap();
                 let world = universe.world();
