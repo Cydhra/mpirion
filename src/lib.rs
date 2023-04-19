@@ -1,13 +1,14 @@
-/// Generate a main method that configures criterion and initializes MPI, or runs the kernel
+/// Generate a main method that configures criterion and initializes MPI, or runs a kernel
 /// function if it is called for an MPI spawned process. Only one group can be defined per benchmark,
 /// so this macro does not take a variadic list of groups.
 ///
 /// The main method will panic if it is called without any arguments. If the first argument is
-/// ``--child``, the kernel function will be executed. Otherwise, the benchmark group will be executed.
+/// ``--child``, it expects a second argument with the name of the kernel function to execute.
+/// Otherwise, the benchmark group will be executed.
 ///
 /// If the benchmark group is called, it accepts all CLI parameters that Criterion usually accepts.
 ///
-/// The macro takes the kernel function as its second argument. The kernel function must take a
+/// The macro takes a variable amount of kernel functions after that. Each kernel function must take a
 /// ``&dyn Communicator`` as its first argument, and a mutable reference to the data type that is
 /// returned by the setup function as its second argument. The communicator is the intra-communicator
 /// of the spawned child processes. It runs the MPI code that is being benchmarked.
@@ -20,7 +21,7 @@
 ///
 /// fn bench_func(c: &mut Criterion, world: &dyn Communicator) {
 ///     c.bench_function("my-bench", |b| {
-///        mpirion_bench!(world, b)
+///        mpirion_bench!(kernel_func, b, world)
 ///     });
 /// }
 ///
@@ -38,13 +39,22 @@
 /// ```
 #[macro_export]
 macro_rules! mpirion_main {
-    ( $group:path, $kernel:path $(,)? ) => {
+    ( $group:path, $($kernel:path),+) => {
         fn main() {
             let mut args = std::env::args();
 
             if let Some(p) = args.nth(1) {
                 if p == "--child" {
-                    execute_kernel();
+                    if let Some(kernel_arg) = args.next() {
+                        match kernel_arg.as_str() {
+                            $(
+                            stringify!($kernel) => paste::paste! {[<execute_kernel_ $kernel>]} (),
+                            )*
+                            _ => panic!("unknown child kernel \"{}\"", kernel_arg),
+                        };
+                    } else {
+                        panic!("called process with --child, but without specifying the kernel");
+                    }
                 } else {
                     $group();
 
@@ -117,38 +127,40 @@ macro_rules! mpirion_group {
 #[macro_export]
 macro_rules! mpirion_kernel {
     ($target:path, $setup:path $(, $t:ty)?) => {
-        fn execute_kernel() {
-            let universe = mpi::initialize().unwrap();
-            let world = universe.world();
+        paste::paste! {
+            fn [<execute_kernel_ $target>] () {
+                let universe = mpi::initialize().unwrap();
+                let world = universe.world();
 
-            let inter_comm = world.parent().expect("child could not retrieve parent comm");
-            let merged_comm = inter_comm.merge(mpi::topology::MergeOrder::High);
+                let inter_comm = world.parent().expect("child could not retrieve parent comm");
+                let merged_comm = inter_comm.merge(mpi::topology::MergeOrder::High);
 
-            let mut iterations = 0u64;
-            mpi::collective::Root::broadcast_into(&merged_comm.process_at_rank(0), &mut iterations);
+                let mut iterations = 0u64;
+                mpi::collective::Root::broadcast_into(&merged_comm.process_at_rank(0), &mut iterations);
 
-            $(
-                let mut input: $t;
-                unsafe {
-                    input = std::mem::zeroed();
-                    mpi::collective::Root::broadcast_into(&merged_comm.process_at_rank(0), &mut input);
+                $(
+                    let mut input: $t;
+                    unsafe {
+                        input = std::mem::zeroed();
+                        mpi::collective::Root::broadcast_into(&merged_comm.process_at_rank(0), &mut input);
+                    }
+                )?
+
+                let mut total_duration = std::time::Duration::from_secs(0);
+                for _ in 0..iterations {
+                    let mut data = $setup(&world,
+                        $(
+                            input as $t
+                        )?
+                    );
+                    mpi::collective::CommunicatorCollectives::barrier(&world);
+                    let start = std::time::Instant::now();
+                    $target(&world, &mut data);
+                    total_duration += start.elapsed();
                 }
-            )?
-
-            let mut total_duration = std::time::Duration::from_secs(0);
-            for _ in 0..iterations {
-                let mut data = $setup(&world,
-                    $(
-                        input as $t
-                    )?
-                );
-                mpi::collective::CommunicatorCollectives::barrier(&world);
-                let start = std::time::Instant::now();
-                $target(&world, &mut data);
-                total_duration += start.elapsed();
+                let nanos = total_duration.as_nanos() as u64;
+                mpi::collective::Root::reduce_into(&merged_comm.process_at_rank(0), &nanos, mpi::collective::SystemOperation::sum());
             }
-            let nanos = total_duration.as_nanos() as u64;
-            mpi::collective::Root::reduce_into(&merged_comm.process_at_rank(0), &nanos, mpi::collective::SystemOperation::sum());
         }
     };
 }
@@ -164,11 +176,12 @@ macro_rules! mpirion_kernel {
 /// See ``mpirion_main!``.
 #[macro_export]
 macro_rules! mpirion_bench {
-    ($world:ident, $bencher:ident $(, $argument:ident)?) => {
+    ($kernel:ident, $bencher:ident, $world:ident $(, $argument:ident)?) => {
         $bencher.iter_custom(|mut iterations| {
             // create child processes
             let mut child_exe = std::process::Command::new(std::env::current_exe().expect("failed to retrieve benchmark executable path"));
             child_exe.arg("--child");
+            child_exe.arg(stringify!($kernel));
 
             let child_inter_comm = mpi::collective::Root::spawn(
                 &$world.process_at_rank(0),

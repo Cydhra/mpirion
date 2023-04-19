@@ -7,7 +7,7 @@ fn collective_comm_benchmark(c: &mut Criterion, world: &dyn Communicator) {
     let mut g = c.benchmark_group("collective-comm");
     for size in [1, 2, 4, 8, 16, 32, 64, 128, 256].into_iter() {
         g.bench_with_input(BenchmarkId::new("message-size", size), &size, |b, &size| {
-            mpirion_bench!(world, b, size)
+            mpirion_bench!(collective_comm_kernel, b, world, size)
         });
     }
     g.finish();
@@ -24,4 +24,4 @@ fn collective_comm_kernel(comm: &dyn Communicator, data: &mut Vec<u64>) {
 
 mpirion_kernel!(collective_comm_kernel, setup, u32);
 mpirion_group!(benches, collective_comm_benchmark);
-mpirion_main!(benches, rank_scatter_kernel);
+mpirion_main!(benches, collective_comm_kernel);

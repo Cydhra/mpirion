@@ -28,7 +28,7 @@ Additionally, you need one extra method which contains the MPI calls you want to
 // It spawns the child processes which run the kernel and measure the time it takes to 
 // run the kernel. The times are then send to the root process and passed to criterion.
 fn simple_benchmark(c: &mut Criterion, world: &dyn Communicator) {
-    c.bench_function("prefix-sum", |b| mpirion_bench!(world, b));
+    c.bench_function("prefix-sum", |b| mpirion_bench!(simple_kernel, b, world));
 }
 
 // This method is called once per iteration (on each MPI process) and returns the data
@@ -58,6 +58,10 @@ one which does not. You can find examples for both.
 Currently, the library makes use of a fork of [rsmpi](https://github.com/rsmpi/rsmpi), so you need to use the 
 `sized_process` branch of the fork. Those features will hopefully be merged into the main repository soon.
 
-## Features
-I mainly created this library for my own projects, so it currently supports only a limited subset of Criterion features.
-If you need more, feel free to open an issue or a pull request; I do plan on maintaining this library.
+## Missing Features
+I mainly created this library for my own projects,
+so while designing I only target Criterion features I explicitly need.
+For example, the library forces the use of `iter_custom` for measurements,
+and does not support multiple benchmark targets per file.
+If you need more features,
+feel free to open an issue or a pull request; I do plan on maintaining this library.

@@ -4,7 +4,7 @@ use mpi::traits::Communicator;
 use mpirion::{mpirion_bench, mpirion_group, mpirion_kernel, mpirion_main};
 
 fn simple_benchmark(c: &mut Criterion, world: &dyn Communicator) {
-    c.bench_function("prefix-sum", |b| mpirion_bench!(world, b));
+    c.bench_function("prefix-sum", |b| mpirion_bench!(simple_kernel, b, world));
 }
 
 fn setup(comm: &dyn Communicator) -> u64 {
