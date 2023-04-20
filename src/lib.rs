@@ -212,7 +212,7 @@ macro_rules! mpirion_bench {
             mpi::collective::Root::broadcast_into(&merged_comm.this_process(), &mut iterations);
             $(
                 let mut input = $argument.clone();
-                merged_comm.this_process().broadcast_into(&mut input);
+                mpi::collective::Root::broadcast_into(&merged_comm.this_process(), &mut input);
             )?
 
             let mut total_nanos: u64 = 0;

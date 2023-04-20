@@ -1,4 +1,4 @@
-use criterion::{black_box, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion};
 use mpi::collective::CommunicatorCollectives;
 use mpi::traits::Communicator;
 use mpirion::{mpirion_bench, mpirion_group, mpirion_kernel, mpirion_main};
