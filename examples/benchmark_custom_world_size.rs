@@ -7,14 +7,14 @@ fn simple_benchmark(c: &mut Criterion, world: &dyn Communicator) {
     let mut group = c.benchmark_group("gossiping");
     for size in 2..=8 {
         group.bench_with_input(BenchmarkId::new("all-to-all", size), &size, |b, &size|
-                // when altering world size, this syntax needs to be used to avoid ambiguity with
-                // input arguments passed to clients
-                mpirion_bench! {
-                    kernel = simple_kernel,
-                    bencher = b,
-                    world = world,
-                    world_size = size
-                });
+            // when altering world size, named parameters syntax needs to be used to avoid
+            // ambiguity with input arguments passed to clients
+            mpirion_bench! {
+                kernel = simple_kernel,
+                bencher = b,
+                world = world,
+                world_size = size
+            });
     }
     group.finish();
 }

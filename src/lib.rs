@@ -185,7 +185,29 @@ macro_rules! mpirion_kernel {
 ///
 ///
 /// # Example
-/// See ``mpirion_main!``.
+/// ```rust
+/// use criterion::Criterion;
+/// use mpi::traits::Communicator;
+/// use mpirion::mpirion_bench;
+///
+/// // a simple benchmark call without arguments and default world size
+/// fn simple_benchmark(c: &mut Criterion, world: &dyn Communicator) {
+///     c.bench_function("prefix-sum", |b| mpirion_bench!(simple_kernel, b, world));
+/// }
+///
+/// // if a world_size is required, it can be specified as a named parameter.
+/// // Unnamed syntax is not allowed if world_size is required.
+/// fn custom_world_benchmark(c: &mut Criterion, world: &dyn Communicator) {
+///    c.bench_function("prefix-sum", |b| mpirion_bench!(
+///         kernel = simple_kernel,
+///         bencher = b,
+///         world = world,
+///         world_size = 8,
+///         arg = 42));
+/// }
+/// ```
+///
+/// For a full benchmark example see ``mpirion_main!`` or the ``examples`` directory.
 #[macro_export]
 macro_rules! mpirion_bench {
     ($kernel:ident, $bencher:ident, $world:expr $(, $argument:expr)?) => {
