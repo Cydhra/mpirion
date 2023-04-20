@@ -58,6 +58,19 @@ one which does not. You can find examples for both.
 Currently, the library makes use of a fork of [rsmpi](https://github.com/rsmpi/rsmpi), so you need to use the 
 `sized_process` branch of the fork. Those features will hopefully be merged into the main repository soon.
 
+## Running the benchmarks
+To run the benchmarks, you can use cargo-mpirun.
+You can install it with `cargo install cargo-mpirun`.
+Then, you can run the benchmarks with `cargo mpirun -n 1 --release --example simple_benchmark -- --bench`.
+The `--bench` argument launches the master process, which spawns the child processes and runs the benchmark kernels.
+You can pass all normal CLI arguments for Criterion after the `--bench` argument.
+If `--bench` is not passed, the executable expects `--child` as first argument,
+and will a kernel specified in the second argument within the MPI environment.
+Running the benchmarks yourself with `--child` is usually not useful,
+it is only used by the master process.
+Only one instance of the master process with `--bench` should be run, i.e. you should use `-n 1`.
+The amount of child processes is determined by the benchmark itself.
+
 ## Missing Features
 I mainly created this library for my own projects,
 so while designing I only target Criterion features I explicitly need.
