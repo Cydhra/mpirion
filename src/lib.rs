@@ -248,10 +248,10 @@ macro_rules! mpirion_kernel {
 /// For a full benchmark example see ``mpirion_main!`` or the ``examples`` directory.
 #[macro_export]
 macro_rules! mpirion_bench {
-    ($kernel:ident, $bencher:ident, $world:expr $(, $argument:expr)?) => {
+    ($kernel:path, $bencher:expr, $world:expr $(, $argument:expr)?) => {
         mpirion_bench!(kernel = $kernel, bencher = $bencher, world = $world, world_size = 4 $(, arg = $argument)?)
     };
-    (kernel = $kernel:ident, bencher = $bencher:ident, world = $world:expr, world_size = $world_size:expr $(, arg = $argument:expr)?) => {
+    (kernel = $kernel:path, bencher = $bencher:expr, world = $world:expr, world_size = $world_size:expr $(, arg = $argument:expr)?) => {
         $bencher.iter_custom(|mut iterations| {
             // create child processes
             let mut child_exe = std::process::Command::new(std::env::current_exe().expect("failed to retrieve benchmark executable path"));
