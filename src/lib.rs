@@ -174,11 +174,24 @@ macro_rules! mpirion_kernel {
 /// After the child processes have finished, the macro will receive he results of the child processes
 /// and calculate the average of them. The average is then used to create a benchmark result.
 ///
+/// # Parameters
+/// - `kernel` the kernel function that clients run
+/// - `bencher` the criterion bencher for collecting results
+/// - `world` the current communicator in which the child processes are spawned
+/// - `world_size` how many children to spawn. This parameter is optional and defaults to 4.
+/// - `argument` optional. An argument to pass to all child processes. This is passed via collective
+/// communication. See `examples/benchmark_with_input` for usage: the `mpirion_group!` macro needs
+/// to know the argument type, and the kernel setup function needs a parameter for it.
+///
+///
 /// # Example
 /// See ``mpirion_main!``.
 #[macro_export]
 macro_rules! mpirion_bench {
-    ($kernel:ident, $bencher:ident, $world:ident $(, $argument:ident)?) => {
+    ($kernel:ident, $bencher:ident, $world:expr $(, $argument:expr)?) => {
+        mpirion_bench!(kernel = $kernel, bencher = $bencher, world = $world, world_size = 4 $(, arg = $argument)?)
+    };
+    (kernel = $kernel:ident, bencher = $bencher:ident, world = $world:expr, world_size = $world_size:expr $(, arg = $argument:expr)?) => {
         $bencher.iter_custom(|mut iterations| {
             // create child processes
             let mut child_exe = std::process::Command::new(std::env::current_exe().expect("failed to retrieve benchmark executable path"));
@@ -188,10 +201,10 @@ macro_rules! mpirion_bench {
             let child_inter_comm = mpi::collective::Root::spawn(
                 &$world.process_at_rank(0),
                 &child_exe,
-                4, // TODO make this a parameter
+                $world_size,
             ).expect("failed to spawn child processes");
             let child_world_size = child_inter_comm.remote_size();
-            assert_eq!(child_world_size, 4);
+            assert_eq!(child_world_size, $world_size);
 
             // create intracomm for parent and the children
             let merged_comm = child_inter_comm.merge(mpi::topology::MergeOrder::Low);
