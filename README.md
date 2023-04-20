@@ -62,6 +62,6 @@ Currently, the library makes use of a fork of [rsmpi](https://github.com/rsmpi/r
 I mainly created this library for my own projects,
 so while designing I only target Criterion features I explicitly need.
 For example, the library forces the use of `iter_custom` for measurements,
-and does not support multiple benchmark targets per file.
+and currently does not support custom measurement functions that don't accept nanoseconds.
 If you need more features,
 feel free to open an issue or a pull request; I do plan on maintaining this library.

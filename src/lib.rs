@@ -1,19 +1,21 @@
 pub use paste::*;
 
 /// Generate a main method that configures criterion and initializes MPI, or runs a kernel
-/// function if it is called for an MPI spawned process. Only one group can be defined per benchmark,
-/// so this macro does not take a variadic list of groups.
+/// function if it is called for an MPI spawned process. Multiple group targets can be specified,
+/// but the user needs to use named parameters syntax to avoid ambiguity with multiple kernel
+/// functions.
 ///
 /// The main method will panic if it is called without any arguments. If the first argument is
 /// ``--child``, it expects a second argument with the name of the kernel function to execute.
 /// Otherwise, the benchmark group will be executed.
 ///
-/// If the benchmark group is called, it accepts all CLI parameters that Criterion usually accepts.
+/// If the benchmark parent is called, it accepts all CLI parameters that Criterion usually accepts.
 ///
-/// The macro takes a variable amount of kernel functions after that. Each kernel function must take a
-/// ``&dyn Communicator`` as its first argument, and a mutable reference to the data type that is
-/// returned by the setup function as its second argument. The communicator is the intra-communicator
-/// of the spawned child processes. It runs the MPI code that is being benchmarked.
+/// The macro takes a variable amount of kernel functions after the group name.
+/// Each kernel function must take a ``&dyn Communicator`` as its first argument, and a mutable
+/// reference to the data type that is returned by the setup function as its second argument.
+/// The communicator is the intra-communicator of the spawned child processes.
+/// It runs the MPI code that is being benchmarked.
 ///
 /// # Example
 /// ```rust
@@ -39,9 +41,35 @@ pub use paste::*;
 /// mpirion_group!(benches, bench_func);
 /// mpirion_main!(benches, kernel_func);
 /// ```
+///
+/// Or named parameters syntax when multiple groups are used:
+/// ```rust
+/// use criterion::Criterion;
+/// use mpi::traits::Communicator;
+/// use mpirion::{mpirion_bench, mpirion_group, mpirion_kernel, mpirion_main};
+///
+/// fn broadcast_benchmark(c: &mut Criterion, world: &dyn Communicator) {
+///     c.bench_function("kernel1", |b| mpirion_bench!(kernel1, b, world));
+/// }
+///
+/// fn reduce_benchmark(c: &mut Criterion, world: &dyn Communicator) {
+///     c.bench_function("kernel2", |b| mpirion_bench!(kernel2, b, world));
+/// }
+///
+/// fn setup(comm: &dyn Communicator) -> u64 { 42 }
+/// fn kernel1(comm: &dyn Communicator, data: &mut u64) { /* do something with data */ }
+/// fn kernel2(comm: &dyn Communicator, data: &u64) { /* do something with data */ }
+///
+/// mpirion_kernel!(kernel1, setup);
+/// mpirion_kernel!(kernel2, setup);
+/// mpirion_group!(kernel1_bench, broadcast_benchmark);
+/// mpirion_group!(kernel2_bench, reduce_benchmark);
+/// // named parameters syntax is required to avoid ambiguity when multiple groups are used
+/// mpirion_main!(groups = kernel1_bench, kernel2_bench; kernels = kernel1, kernel2);
+/// ```
 #[macro_export]
 macro_rules! mpirion_main {
-    ( $group:path, $($kernel:path),+) => {
+    (groups = $($group:path),+; kernels = $($kernel:path),+) => {
         fn main() {
             let mut args = std::env::args();
 
@@ -58,7 +86,12 @@ macro_rules! mpirion_main {
                         panic!("called process with --child, but without specifying the kernel");
                     }
                 } else {
-                    $group();
+                    // create universe in main function so MPI is only initialized once
+                    let universe = mpi::initialize().unwrap();
+
+                    $(
+                    $group(&universe);
+                    )*
 
                     criterion::Criterion::default()
                         .configure_from_args()
@@ -67,6 +100,12 @@ macro_rules! mpirion_main {
             } else {
                 panic!("Expected cli arguments for criterion or for MPI child process.")
             }
+        }
+    };
+    ( $group:path, $($kernel:path),+) => {
+        $crate::mpirion_main!{
+            groups = $group;
+            kernels = $($kernel),+
         }
     };
 }
@@ -81,11 +120,10 @@ macro_rules! mpirion_main {
 #[macro_export]
 macro_rules! mpirion_group {
     (name = $name:ident; config = $config:expr; target = $target:path) => {
-        pub fn $name() {
+        pub fn $name(universe: &mpi::environment::Universe) {
             let mut criterion: criterion::Criterion<_> = $config
                 .configure_from_args();
 
-            let universe = mpi::initialize().unwrap();
             let world = universe.world();
             let rank = world.rank() as usize;
             let world_size = world.size() as usize;
@@ -168,8 +206,9 @@ macro_rules! mpirion_kernel {
 }
 
 /// Generate the communication and spawning code for a benchmark. This macro must be called inside
-/// the ``criterion::Criterion::bench_function`` closure. The macro will spawn child processes
-/// and then supply the child processes with the number of iterations that should be executed.
+/// the ``criterion::Criterion::bench_function`` closure (or one of its variants).
+/// The macro will spawn child processes and then supply the child processes with the number of
+/// iterations that should be executed.
 ///
 /// After the child processes have finished, the macro will receive he results of the child processes
 /// and calculate the average of them. The average is then used to create a benchmark result.
@@ -182,7 +221,6 @@ macro_rules! mpirion_kernel {
 /// - `argument` optional. An argument to pass to all child processes. This is passed via collective
 /// communication. See `examples/benchmark_with_input` for usage: the `mpirion_group!` macro needs
 /// to know the argument type, and the kernel setup function needs a parameter for it.
-///
 ///
 /// # Example
 /// ```rust
