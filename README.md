@@ -11,13 +11,13 @@ The benchmarks accept all the same command line arguments as Criterion, but you 
 To use the macros, add the following to your `Cargo.toml`:
 ```toml
 [dependencies]
-mpi = { version = "0.6", git = "https://github.com/Cydhra/rsmpi", branch="sized_process" }
+mpi = { version = "0.7", git = "https://github.com/Cydhra/rsmpi", branch="allow_dyn_comm" }
 
 # snip
 
 [dev-dependencies]
-criterion = "0.4"
-mpirion = { version = "0.1", git="https://github.com/Cydhra/mpirion" }
+criterion = "0.5"
+mpirion = { version = "0.2", git="https://github.com/Cydhra/mpirion" }
 ```
 
 The benchmark structure is similar to Criterion's, but you need to use the `mpirion` macros instead of `criterion`.
@@ -56,7 +56,7 @@ There are two flavors of the macros, one which accepts
 one which does not. You can find examples for both.
 
 Currently, the library makes use of a fork of [rsmpi](https://github.com/rsmpi/rsmpi), so you need to use the 
-`sized_process` branch of the fork. Those features will hopefully be merged into the main repository soon.
+`allow_dyn_comm` branch of the fork. Those features will hopefully be merged into the main repository soon.
 
 ## Running the benchmarks
 To run the benchmarks, you can use cargo-mpirun.
@@ -77,4 +77,4 @@ so while designing I only target Criterion features I explicitly need.
 For example, the library forces the use of `iter_custom` for measurements,
 and currently does not support custom measurement functions that don't accept nanoseconds.
 If you need more features,
-feel free to open an issue or a pull request; I do plan on maintaining this library.
+feel free to open an issue or a pull request.
